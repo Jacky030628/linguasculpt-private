@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinguaSculpt — 文本AI味消除Agent &amp; 白盒语言学精雕工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 0;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .node-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .node-active {
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.28);
+      transform: translateY(-2px);
+    }
+    .node-done {
+      border-color: #10b981 !important;
+    }
+    .node-loop {
+      border-color: #f59e0b !important;
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.25);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    .diff-del {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      text-decoration: line-through;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .diff-ins {
+      background-color: rgba(16, 185, 129, 0.22);
+      color: #6ee7b7;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+    /* LinguaSculpt User Portal — Original Editorial & Sculptural Theme */
+    .user-sculpt-bg {
+      background-color: #f8fafc;
+      background-image:
+        radial-gradient(at 15% 10%, rgba(16, 185, 129, 0.07) 0px, transparent 45%),
+        radial-gradient(at 85% 20%, rgba(20, 184, 166, 0.06) 0px, transparent 45%),
+        linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    }
+    .user-added-change {
+      background: linear-gradient(120deg, rgba(16, 185, 129, 0.16) 0%, rgba(20, 184, 166, 0.16) 100%);
+      color: #065f46;
+      border-bottom: 1.5px solid rgba(16, 185, 129, 0.5);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .hide-user-changes .user-added-change {
+      background: transparent !important;
+      color: inherit !important;
+      border-bottom-color: transparent !important;
+      padding: 0 !important;
+      font-weight: inherit !important;
+    }
+    input[type="range"].sculpt-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, #e2e8f0 0%, #99f6e4 50%, #6ee7b7 100%);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"].sculpt-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #059669;
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.35);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    input[type="range"].sculpt-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-emerald-500 selection:text-white">
+
+  <!-- ===================================================================== -->
+  <!-- TOP-RIGHT FLOATING CONTROLS (Clean for Users; Admin Console Switcher) -->
+  <!-- ===================================================================== -->
+  <div class="fixed top-4 right-4 sm:right-6 z-40 flex items-center gap-2.5">
+    <div id="hostedEngineStatusPill" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 border border-emerald-200/90 shadow-sm text-xs font-medium text-emerald-800">
+      <span id="apiStatusDotTop" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="hostedEngineStatusLabel">云端精雕引擎已就绪 (deepseek-r1)</span>
+    </div>
+
+    <button id="switchAdminViewBtn" type="button" onclick="window.togglePortalView && window.togglePortalView()" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/90 hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 border border-slate-200/90 shadow-sm transition flex items-center gap-1.5 cursor-pointer" title="切换至管理员白盒后台与高级模型路由中心">
+      <span>白盒管理员后台</span>
+    </button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PORTAL 1: LINGUASCULPT USER-FACING MINIMALIST WORKSPACE               -->
+  <!-- ===================================================================== -->
+  <div id="userPortalView" class="flex-1 user-sculpt-bg text-slate-900 pb-20">
+    <!-- Brand Hero Header -->
+    <div class="max-w-4xl mx-auto px-4 pt-9 pb-6 text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-medium mb-3">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span>LinguaSculpt · 文本AI味消除Agent</span>
+      </div>
+      <h1 class="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        Sculpt AI Drafts into <span class="bg-gradient-to-r from-slate-900 via-teal-800 to-emerald-600 bg-clip-text text-transparent">Authentic Human Prose</span>
+      </h1>
+    </div>
+
+    <!-- Main LinguaSculpt Split Studio Card -->
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-[0_12px_40px_rgba(15,23,42,0.06)] overflow-hidden">
+
+        <!-- Studio Toolbar Bar -->
+        <div class="px-5 py-3.5 border-b border-slate-200/90 flex flex-wrap items-center justify-between gap-4 bg-slate-50/70">
+          <!-- Left: Terminology & Definition Lock Toggle -->
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-sm cursor-pointer hover:border-emerald-400 transition">
+              <input id="userCustomStyleToggle" type="checkbox" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5" />
+              <span class="text-xs font-semibold text-slate-700">专有术语与定义保护锁</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold mono">Auto-Protected</span>
+            </label>
+
+            <!-- Collapsible Custom Term Lock Input -->
+            <div id="userCustomLockWrapper" class="hidden items-center gap-1.5">
+              <input id="userEntityLockInput" type="text" placeholder="输入不可改动的术语（逗号分隔）..." class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-slate-700 w-64 focus:outline-none focus:border-emerald-500 mono" />
+            </div>
+          </div>
+
+          <!-- Right: Target Register & Stylistic Cadence Selects -->
+          <div class="flex flex-wrap items-center gap-2.5 text-xs">
+            <div class="flex items-center gap-1.5 bg-white border border-slate-200/90 rounded-xl px-3 py-1.5 shadow-sm">
+              <span class="text-slate-400 font-medium">目标语域:</span>
+              <select id="userWritingLevelSelect" class="font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                <option value="Strict Academic">学术严谨 (Academic Prose)</option>
+                <option value="Executive Commentary">商业洞察 (Executive Brief)</option>
+                <option value="Tech Thought-Leadership">科技专栏 (Thought-Leadership)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-white border border-slate-200/90 rounded-xl px-3 py-1.5 shadow-sm">
+              <span class="text-slate-400 font-medium">句法节奏:</span>
+              <select id="userToneSelect" class="font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                <option value="free">自然流利 (Natural Flow)</option>
+                <option value="formal">庄重严谨 (Formal Scholarly)</option>
+                <option value="concise">紧凑凝练 (Crisp &amp; Direct)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-Column Split Workspace -->
+        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200/90 min-h-[430px]">
+
+          <!-- Left Pane: Source Draft Input -->
+          <div class="flex flex-col justify-between relative bg-white">
+            <div class="px-5 pt-3.5 pb-1 flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mono">Source Draft · 待精雕原稿</span>
+              <button id="userClearBtn" type="button" class="text-xs text-slate-400 hover:text-rose-600 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-100 transition cursor-pointer" title="清空输入文本">
+                <span>清空</span>
+              </button>
+            </div>
+
+            <textarea id="userSourceTextarea" rows="11" class="w-full flex-1 px-5 py-3 text-[14.5px] leading-relaxed text-slate-800 placeholder-slate-400 resize-none border-0 focus:outline-none focus:ring-0 bg-transparent" placeholder="在此粘贴英文初稿，点击右下角【Sculpt Prose · 开始精雕】执行无损去 AI 味改写..."></textarea>
+
+            <!-- Left Pane Bottom Controls: Sculpting Depth + Primary Action Button -->
+            <div class="px-5 pb-5 pt-3 border-t border-slate-100 bg-slate-50/40 space-y-3.5">
+              <!-- Sculpting Depth Slider -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-1.5 font-semibold text-slate-700">
+                    <span>精雕强度 (Sculpting Depth)</span>
+                  </div>
+                  <span class="text-[11px] text-emerald-700 font-medium">按强度编辑，执行独立检查</span>
+                </div>
+                <input id="userRewriteSlider" type="range" min="1" max="3" step="1" value="3" class="sculpt-slider" />
+                <div class="flex items-center justify-between text-xs pt-0.5 select-none">
+                  <button type="button" data-level="1" class="user-level-lbl text-slate-500 hover:text-emerald-700 transition cursor-pointer">1 · 轻度词块润色</button>
+                  <button type="button" data-level="2" class="user-level-lbl text-slate-500 hover:text-emerald-700 transition cursor-pointer">2 · 句法顺装整合</button>
+                  <button type="button" data-level="3" class="user-level-lbl font-bold text-emerald-700 transition cursor-pointer">3 · 深度散文精雕</button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <span id="userInputWordsLabel" class="text-xs text-slate-500 font-medium mono">0 words</span>
+                <button id="userHumanizeActionBtn" type="button" onclick="window.triggerUserSculpt && window.triggerUserSculpt()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer">
+                  <svg class="w-4 h-4 text-emerald-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  <span id="userHumanizeBtnText">Sculpt Prose · 开始精雕</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Pane: Sculpted Output & Quality Verification -->
+          <div class="flex flex-col justify-between bg-white">
+            <div class="px-5 pt-3.5 pb-1 flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mono">Sculpted Output · 精雕成稿</span>
+              <button id="toggleAddedChangeHighlightBtn" type="button" class="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 py-0.5 px-2 rounded-md hover:bg-slate-100 transition cursor-pointer" title="点击切换显示/隐藏修改处高亮底色">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>高亮精雕词句</span>
+                <svg id="eyeIconSvg" class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+
+            <div id="userOutputDisplay" class="px-5 py-3 flex-1 text-[14.5px] leading-relaxed text-slate-800 whitespace-pre-wrap overflow-y-auto max-h-[410px]"></div>
+
+            <!-- Collapsible Authenticity & Fidelity Badge Bar -->
+            <div id="userCheckAiResultBar" class="mx-5 mb-2 px-3.5 py-2 rounded-xl bg-emerald-50/90 border border-emerald-200/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span id="userCheckAiScoreText" class="font-bold text-emerald-900">尚未执行检查</span>
+              </div>
+              <span id="userCheckAiFidelityText" class="text-emerald-700 font-medium">等待后端验证</span>
+            </div>
+
+            <!-- Right Pane Bottom Footer -->
+            <div class="px-5 pb-5 pt-3 border-t border-slate-100 bg-slate-50/40 flex items-center justify-between">
+              <span id="userOutputWordsLabel" class="text-xs text-slate-500 font-medium mono">0 words</span>
+
+              <div class="flex items-center gap-2">
+                <button id="userCheckAiBtn" type="button" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-emerald-50/50 hover:border-emerald-300 text-slate-700 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer">
+                  <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <span>自然度与保真度核验</span>
+                </button>
+
+                <button id="userCopyBtn" type="button" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer" title="复制精雕后纯净文本">
+                  <svg class="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                  </svg>
+                  <span>复制成稿</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Under-Card Modification Notes Section -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-4 px-1">
+        <button id="toggleUserModDetailsBtn" type="button" class="text-xs font-semibold text-slate-700 hover:text-emerald-700 flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200/90 shadow-sm transition cursor-pointer">
+          <span>查看本次句法精雕说明与逐句对照</span>
+          <span id="userModCountBadge" class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-bold">0 处修改</span>
+        </button>
+      </div>
+
+      <!-- User-Friendly Modification Summary Card -->
+      <div id="userModSummaryCard" class="mt-3 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-slate-800">LinguaSculpt 修改记录</span>
+            <span id="userModLevelTag" class="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">精雕档位: 3 · 深度散文精雕</span>
+          </div>
+        </div>
+        <div id="userModListContainer" class="space-y-2.5 text-xs"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PORTAL 2: BACKEND ADMIN CONSOLE (4-Node White-Box & Multi-LLM Studio) -->
+  <!-- ===================================================================== -->
+  <div id="adminPortalView" class="hidden flex-1 flex flex-col bg-[#0b0f19] text-slate-200">
+    <!-- Admin Sub-Header -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/20">
+            LS
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="font-bold text-base sm:text-lg tracking-tight text-white">LinguaSculpt Admin Console</h2>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 mono">43d VIF-Pruned Probe + 3-Round Loop</span>
+            </div>
+            <p class="text-xs text-slate-400">White-Box Stylometric Attribution (c<sub>i</sub> = &beta;<sub>i</sub> &middot; z<sub>i</sub>) &amp; Closed-Loop Surgical Rewriting Workflow (Thr = 0.34)</p>
+          </div>
+        </div>
+
+        <!-- Engine & API Configuration Controls -->
+        <div class="flex flex-wrap items-center gap-2 mr-28">
+          <div class="flex items-center bg-slate-800/90 p-1 rounded-lg border border-slate-700 text-xs">
+            <button id="modeBuiltInBtn" type="button" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition cursor-pointer">
+              内置多轮 Agent 引擎 (免 Key 实测)
+            </button>
+            <button id="modeLiveApiBtn" type="button" class="px-2.5 py-1 rounded-md font-medium bg-sky-600 text-white transition cursor-pointer">
+              接入真实 LLM API (DeepSeek-R1 / V3 / Qwen / GPT-4o)
+            </button>
+          </div>
+
+          <label class="flex items-center gap-1.5 text-xs bg-slate-800/90 px-2.5 py-1.5 rounded-lg border border-slate-700 text-slate-300 cursor-pointer" title="勾选后即使前两轮低于34%也会跑满3轮以观察三轮递进效果">
+            <input id="forceThreeRoundsToggle" type="checkbox" checked class="rounded bg-slate-900 border-slate-600 text-sky-500 focus:ring-0" />
+            <span>跑满 3 轮递进循环 (Max=3)</span>
+          </label>
+
+          <button id="openApiModalBtn" type="button" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+            <span id="apiStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="apiStatusText">切换模型 (当前: deepseek-r1)</span>
+          </button>
+
+          <button id="runWorkflowBtn" type="button" class="text-xs sm:text-sm px-4 py-1.5 rounded-lg bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold shadow-lg shadow-sky-500/25 flex items-center gap-2 transition cursor-pointer">
+            <span>启动 4 节点闭环 Agent</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 4-Node DAG Visual State Machine Bar -->
+    <section class="bg-slate-900/50 border-b border-slate-800/80">
+      <div class="max-w-7xl mx-auto px-4 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">LangGraph 4-Node Closed-Loop State Machine</span>
+            <span id="workflowStateBadge" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 mono">STATE: READY</span>
+          </div>
+          <div class="text-xs text-slate-400 mono" id="loopCounterBadge">Iteration: 0 / 3</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Node 1 -->
+          <div id="dagNode1" class="node-card rounded-xl bg-slate-900 border border-slate-800 p-3 cursor-pointer" title="点击配置节点模型">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-sky-400 mono">NODE 1 · PROBE</span>
+              <span id="node1Status" class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 mono">IDLE</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">白盒 43 维探针与实体识别</span>
+              <span id="node1EngineBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20 mono">43d Math + Local</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1" id="node1Summary">计算 Z-Score 与推力 c<sub>i</sub> = &beta;<sub>i</sub> &middot; z<sub>i</sub>，自动锁定专有术语与引用</p>
+          </div>
+
+          <!-- Node 2 -->
+          <div id="dagNode2" class="node-card rounded-xl bg-slate-900 border border-slate-800 p-3 cursor-pointer" title="点击配置节点模型">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-indigo-400 mono">NODE 2 · ROUTER</span>
+              <span id="node2Status" class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 mono">IDLE</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">策略路由与冲突消解编译器</span>
+              <span id="node2EngineBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mono">deepseek-r1</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1" id="node2Summary">按轮次递进编译 Top-K 手术原语与句长配额，消解句法冲突</p>
+          </div>
+
+          <!-- Node 3 -->
+          <div id="dagNode3" class="node-card rounded-xl bg-slate-900 border border-slate-800 p-3 cursor-pointer" title="点击配置节点模型">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-purple-400 mono">NODE 3 · REWRITER</span>
+              <span id="node3Status" class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 mono">IDLE</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">靶向语言学微创手术 Agent</span>
+              <span id="node3EngineBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 mono">deepseek-r1</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1" id="node3Summary">调用最强 DeepSeek 模型执行动态手术单并输出纯中文修改记录</p>
+          </div>
+
+          <!-- Node 4 -->
+          <div id="dagNode4" class="node-card rounded-xl bg-slate-900 border border-slate-800 p-3 cursor-pointer" title="点击配置节点模型">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-emerald-400 mono">NODE 4 · VERIFIER GATE</span>
+              <span id="node4Status" class="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 mono">IDLE</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-white">闭环复检门控与残差 Critic</span>
+              <span id="node4EngineBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mono">43d Gate + Critic</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1" id="node4Summary">重跑探针并校验四维语义守恒，最多循环 3 轮 (Round 1 &rarr; 2 &rarr; 3)</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Two-Column Admin Studio Layout -->
+    <main class="max-w-7xl mx-auto px-4 py-4 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- Left Column (5 cols): Source Input + Node 1 White-Box Diagnostics -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+
+        <!-- Input Card -->
+        <div class="rounded-xl bg-slate-900 border border-slate-800 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">1. 待诊断与改写源文本 (Source Draft)</span>
+            <div class="flex items-center gap-1.5">
+              <label for="presetSelect" class="text-xs text-slate-400">典型测试样本:</label>
+              <select id="presetSelect" class="text-xs bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="digital_minimalism">样本 A：数字极简主义与注意力恢复理论 (ART 学术)</option>
+                <option value="healthcare">样本 B：医疗 AI 商业评论 (3 轮递进闭环)</option>
+                <option value="academic">样本 C：计算机 ACL 论文摘要 (严格学术语域)</option>
+                <option value="saas">样本 D：出海 SaaS 营销落地页 (高 Yule's K 词汇复现)</option>
+              </select>
+            </div>
+          </div>
+
+          <textarea id="sourceTextInput" rows="6" class="w-full rounded-lg bg-slate-950 border border-slate-800 p-3 text-xs sm:text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-sky-500" placeholder="粘贴英文段落，点击上方【启动 4 节点闭环 Agent】..."></textarea>
+
+          <!-- Register & Entity Lock Bar -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
+            <div>
+              <label for="registerSelect" class="block text-[11px] text-slate-400 mb-1">目标语域护栏 (Target Register)</label>
+              <select id="registerSelect" class="w-full text-xs bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-slate-200">
+                <option value="Strict Academic">Strict Academic (严格学术：保护术语引号与定义)</option>
+                <option value="Executive Commentary">Executive Business Commentary (商业深度评论)</option>
+                <option value="Tech Thought-Leadership">Tech Thought-Leadership Essay (科技专栏)</option>
+              </select>
+            </div>
+            <div>
+              <label for="entityLockInput" class="block text-[11px] text-slate-400 mb-1">不可变实体锁 (Entity Locks, 逗号分隔)</label>
+              <input id="entityLockInput" type="text" value="Attention restoration theory (ART), Kaplan and Kaplan (1989), voluntary focus" class="w-full text-xs bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-slate-200 mono" />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-800/80 text-xs">
+            <span class="text-slate-400" id="wordCountStats">词数: 0 words | 句数: 0 sents</span>
+            <button id="probeOnlyBtn" type="button" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition cursor-pointer">
+              仅运行 Node 1 白盒探针
+            </button>
+          </div>
+        </div>
+
+        <!-- White-Box Diagnostic Dashboard -->
+        <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 flex-1 flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">2. 白盒探针实时诊断与四维雷达 (Node 1 Output)</span>
+            <span class="text-[11px] text-slate-400 mono">Thr = 34.0%</span>
+          </div>
+
+          <!-- Score Comparison Cards -->
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="rounded-lg bg-slate-950 border border-slate-800 p-2.5">
+              <div class="text-[11px] text-slate-400">初始 AI 概率</div>
+              <div id="initProbDisplay" class="text-xl font-bold text-rose-400 mono mt-0.5">78.5%</div>
+              <div class="text-[10px] text-rose-300/80 mt-0.5">HIGH AI RISK</div>
+            </div>
+            <div class="rounded-lg bg-slate-950 border border-slate-800 p-2.5">
+              <div class="text-[11px] text-slate-400">当前闭环复检概率</div>
+              <div id="finalProbDisplay" class="text-xl font-bold text-emerald-400 mono mt-0.5">16.2%</div>
+              <div id="finalStatusLabel" class="text-[10px] text-emerald-300/80 mt-0.5">PASSED (&lt; 34%)</div>
+            </div>
+            <div class="rounded-lg bg-slate-950 border border-slate-800 p-2.5">
+              <div class="text-[11px] text-slate-400">句长标准差 (Burstiness)</div>
+              <div id="burstinessDisplay" class="text-xl font-bold text-sky-400 mono mt-0.5">5.2 &rarr; 7.9w</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">人类基准: ~9.5w</div>
+            </div>
+          </div>
+
+          <!-- 4-Dimension Radar Chart Container -->
+          <div class="rounded-lg bg-slate-950 border border-slate-800 p-3">
+            <div class="text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+              <span>四大正交语言学维度异常风险雷达 (0=人类自然分布, 100=重度AI模板)</span>
+            </div>
+            <div class="relative h-56 w-full">
+              <canvas id="radarChartCanvas"></canvas>
+            </div>
+          </div>
+
+          <!-- Top-5 Triggered Orthogonal Features -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium text-slate-300">Top-5 罪魁正交特征归因排序 (c<sub>i</sub> = &beta;<sub>i</sub> &middot; z<sub>i</sub>)</span>
+              <span class="text-[11px] text-slate-400 mono">VIF &le; 4.82</span>
+            </div>
+            <div id="culpritFeaturesList" class="space-y-2"></div>
+          </div>
+
+          <!-- High-Risk N-gram Badges -->
+          <div>
+            <div class="text-xs font-medium text-slate-300 mb-1.5">命中的论文高权重 AI N-grams (Cell 19 词表)</div>
+            <div id="ngramBadgesContainer" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column (7 cols): Multi-Round Agent Loop Trace, Dynamic Prompt & Surgical Diff -->
+      <div class="lg:col-span-7 flex flex-col gap-4">
+
+        <!-- Agent Execution Trace & Round Selector Card -->
+        <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 flex flex-col gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">3. 多轮闭环迭代轨迹与手术对比 (Multi-Turn Agent Loop)</span>
+              <p class="text-xs text-slate-400 mt-0.5">点击下方轮次标签，查看每一轮 Node 2 编译的指令、Node 3 改写结果及 Node 4 复检门控判定</p>
+            </div>
+            <!-- View Tabs -->
+            <div class="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+              <button id="tabRound1Btn" type="button" class="px-2.5 py-1 rounded font-medium bg-slate-900 text-amber-300 border border-amber-500/30 transition cursor-pointer">
+                第 1 轮 (R1 词块清洗)
+              </button>
+              <button id="tabRound2Btn" type="button" class="px-2.5 py-1 rounded font-medium bg-slate-900 text-amber-300 border border-amber-500/30 transition cursor-pointer">
+                第 2 轮 (R2 句法顺装)
+              </button>
+              <button id="tabRound3Btn" type="button" class="px-2.5 py-1 rounded font-medium bg-sky-600 text-white transition cursor-pointer">
+                第 3 轮 (R3 节奏收敛)
+              </button>
+              <button id="tabPromptBtn" type="button" class="px-2.5 py-1 rounded font-medium text-slate-300 hover:text-white transition cursor-pointer">
+                Node 2 动态 Prompt
+              </button>
+              <button id="tabAblationBtn" type="button" class="px-2.5 py-1 rounded font-medium text-slate-300 hover:text-white transition cursor-pointer">
+                A/B 消融看板 (N=8)
+              </button>
+            </div>
+          </div>
+
+          <!-- Node 4 Gate Feedback Banner -->
+          <div id="gateFeedbackBanner" class="rounded-lg bg-emerald-950/40 border border-emerald-500/30 p-3 text-xs flex items-start gap-2.5">
+            <span class="text-emerald-400 font-bold mono mt-0.5">[NODE 4 GATE]</span>
+            <div id="gateFeedbackText" class="text-slate-200 leading-relaxed"></div>
+          </div>
+
+          <!-- Side-by-Side / Inline Diff Display -->
+          <div id="diffViewSection" class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="rounded-lg bg-slate-950 border border-slate-800 p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-semibold text-rose-400 mono" id="beforePanelTitle">BEFORE (输入源文本)</span>
+                </div>
+                <p id="beforeTextContent" class="text-xs sm:text-sm text-slate-300 leading-relaxed"></p>
+              </div>
+              <div class="rounded-lg bg-slate-950 border border-emerald-500/30 p-3">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-semibold text-emerald-400 mono" id="afterPanelTitle">AFTER ROUND 3 (微创改写后)</span>
+                  <button id="copyResultBtn" type="button" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer">
+                    复制结果
+                  </button>
+                </div>
+                <p id="afterTextContent" class="text-xs sm:text-sm text-emerald-50 leading-relaxed"></p>
+              </div>
+            </div>
+
+            <!-- Highlighted Inline Surgery Diff -->
+            <div class="rounded-lg bg-slate-950 border border-slate-800 p-3">
+              <div class="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span>逐句微创手术高亮对比 (红色删除为高危 AI 模板，绿色高亮为靶向注入的人类句法结构)</span>
+                <span id="guardrailCheckBadge" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 mono">
+                  Entity Lock: 100% | Semantic Recall: 100%
+                </span>
+              </div>
+              <div id="inlineDiffContainer" class="text-xs sm:text-sm leading-relaxed text-slate-200"></div>
+            </div>
+          </div>
+
+          <!-- Compiled Prompt Inspector -->
+          <div id="promptViewSection" class="hidden">
+            <div class="rounded-lg bg-slate-950 border border-slate-800 p-3">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-indigo-300 mono">Node 2 StrategyRouterCompiler 动态生成的 System Prompt</span>
+                <button id="copyPromptBtn" type="button" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer">
+                  复制 Prompt
+                </button>
+              </div>
+              <pre id="compiledPromptPre" class="text-xs text-slate-300 mono whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto p-2 bg-slate-900/70 rounded border border-slate-800"></pre>
+            </div>
+          </div>
+
+          <!-- Batch A/B Ablation Benchmark Section -->
+          <div id="ablationViewSection" class="hidden space-y-3">
+            <div class="rounded-lg bg-slate-950 border border-sky-500/30 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span class="text-xs font-semibold text-sky-300 mono">Google Colab + DeepSeek 跨领域批量 A/B 消融实验实测成绩单 (N=8, 4 大垂直领域)</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 mono">真实挂载论文 .pkl 模型实测</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs mono">
+                  <thead>
+                    <tr class="border-b border-slate-800 text-slate-400">
+                      <th class="py-2 px-2">实验组别 (Experiment Arm)</th>
+                      <th class="py-2 px-2">执行结果</th>
+                      <th class="py-2 px-2">表面达标率</th>
+                      <th class="py-2 px-2">严格QA达标率(北极星)</th>
+                      <th class="py-2 px-2">Reward Hacking 过矫率</th>
+                      <th class="py-2 px-2">核心实体保留率</th>
+                      <th class="py-2 px-2">平均迭代轮数</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/70 text-slate-200">
+                    <tr>
+                      <td class="py-2 px-2 text-slate-300">A_Baseline_BlackBox (通用黑盒)</td>
+                      <td class="py-2 px-2 text-amber-300">12.6%</td>
+                      <td class="py-2 px-2">100.0%</td>
+                      <td class="py-2 px-2 text-amber-300">37.5%</td>
+                      <td class="py-2 px-2">12.5%</td>
+                      <td class="py-2 px-2 text-rose-400 font-semibold">91.7% (事实丢失!)</td>
+                      <td class="py-2 px-2">1.00 轮</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 px-2 text-amber-300">B_v1.0_WhiteBox_OpenLoop (单轮开环)</td>
+                      <td class="py-2 px-2 text-emerald-300">2.3%</td>
+                      <td class="py-2 px-2">100.0%</td>
+                      <td class="py-2 px-2 text-rose-400 font-semibold">0.0% (全军覆没)</td>
+                      <td class="py-2 px-2 text-rose-400 font-semibold">100.0% (微碎片作弊!)</td>
+                      <td class="py-2 px-2 text-emerald-300">100.0%</td>
+                      <td class="py-2 px-2">1.00 轮</td>
+                    </tr>
+                    <tr class="bg-emerald-950/25">
+                      <td class="py-2 px-2 text-emerald-400 font-bold">C_v1.1_WhiteBox_ClosedLoop (Ours)</td>
+                      <td class="py-2 px-2 text-emerald-400 font-bold">1.6% (最低)</td>
+                      <td class="py-2 px-2 text-emerald-400 font-bold">100.0%</td>
+                      <td class="py-2 px-2 text-emerald-400 font-bold">50.0% (行业领先)</td>
+                      <td class="py-2 px-2 text-sky-300 font-semibold">压制 50.0% 过矫</td>
+                      <td class="py-2 px-2 text-emerald-400 font-bold">100.0% (零篡改)</td>
+                      <td class="py-2 px-2 text-sky-300">1.62 轮</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Applied Linguistic Surgeries Breakdown List -->
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">本轮执行的语言学微创手术明细 (Applied Action Primitives)</div>
+            <div id="surgeriesListContainer" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- Real-Time Agent Execution Log Console -->
+        <div class="rounded-xl bg-slate-900 border border-slate-800 p-4 flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">4. Agent 节点状态流转实时日志 (LangGraph State Trace)</span>
+            <button id="clearLogBtn" type="button" class="text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer">清空日志</button>
+          </div>
+          <div id="agentLogConsole" class="flex-1 rounded-lg bg-slate-950 border border-slate-800 p-3 mono text-xs text-slate-300 space-y-1.5 max-h-56 overflow-y-auto"></div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- ADMIN-ONLY MODAL: 4-Node Multi-LLM Routing (DeepSeek-R1/V3/Qwen/GPT)  -->
+  <!-- ===================================================================== -->
+  <div id="apiModalOverlay" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full p-5 shadow-2xl space-y-4 my-8 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-white">4 节点异构大模型 API 路由配置中心 (Multi-LLM Node Routing)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">默认启用 Vercel / Colab 服务端托管的 OWNER_API_KEY（支持 DeepSeek-R1 满血推理版 deepseek-reasoner 与 DeepSeek-V3）</p>
+        </div>
+        <button id="closeApiModalBtn" type="button" class="text-slate-400 hover:text-white text-sm px-2 py-1 cursor-pointer">&times;</button>
+      </div>
+
+      <!-- Quick One-Click Sync Bar -->
+      <div class="rounded-xl bg-slate-950 border border-sky-500/30 p-3.5 space-y-2.5 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="font-semibold text-sky-300">快捷填充：一键同步同一厂商模型到全部节点（留空 API Key 则自动使用服务端 OWNER_API_KEY）</span>
+          <button id="syncAllNodesBtn" type="button" class="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium transition cursor-pointer">
+            将下方快捷配置同步至 Node 1~4
+          </button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div>
+            <label class="block text-slate-400 mb-1">快捷旗舰模型预设 (Flagship Preset)</label>
+            <select id="quickProviderSelect" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-slate-200">
+              <option value="deepseek_r1">DeepSeek-R1 满血推理版 (deepseek-reasoner · 最强推荐)</option>
+              <option value="deepseek">DeepSeek-V3 最新旗舰版 (deepseek-chat · 极速高质)</option>
+              <option value="qwen_max">阿里通义千问旗舰 (qwen-max)</option>
+              <option value="gpt4o">OpenAI 旗舰 (gpt-4o)</option>
+              <option value="gemini_pro">Google Gemini 旗舰 (gemini-2.5-pro)</option>
+              <option value="siliconflow">硅基流动 (deepseek-ai/DeepSeek-R1)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">快捷 Base URL</label>
+            <input id="apiBaseUrlInput" type="text" value="https://api.deepseek.com/v1" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-slate-200 mono" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">可选覆盖 API Key (留空则走 Vercel 环境变量)</label>
+            <input id="apiKeyInput" type="password" placeholder="留空即自动调用服务端 OWNER_API_KEY" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-slate-200 mono" />
+            <input id="apiModelInput" type="hidden" value="deepseek-reasoner" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Independent Node Configuration Cards (2x2 Grid) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <!-- Node 1 Config -->
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sky-400 mono">NODE 1 · PROBE (白盒探针 + 实体识别)</span>
+            <select id="n1Preset" data-node="1" class="node-preset-select text-[11px] bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-200">
+              <option value="local">纯白盒数学探针 (0延迟·免Key)</option>
+              <option value="deepseek_r1">DeepSeek-R1 (deepseek-reasoner)</option>
+              <option value="deepseek">DeepSeek-V3 (deepseek-chat)</option>
+              <option value="qwen_max">阿里 Qwen-Max (qwen-max)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="n1BaseUrl" type="text" placeholder="Base URL" value="" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+            <input id="n1Model" type="text" placeholder="Model" value="43d-Math-Probe" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+          </div>
+          <input id="n1ApiKey" type="password" placeholder="Node 1 API Key (可选)" class="w-full rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+        </div>
+
+        <!-- Node 2 Config -->
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-indigo-400 mono">NODE 2 · ROUTER (策略路由与手术规划)</span>
+            <select id="n2Preset" data-node="2" class="node-preset-select text-[11px] bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-200">
+              <option value="local">内置确定性规则编译器 (推荐·0延迟)</option>
+              <option value="deepseek_r1">DeepSeek-R1 (deepseek-reasoner)</option>
+              <option value="deepseek">DeepSeek-V3 (deepseek-chat)</option>
+              <option value="qwen_max">阿里 Qwen-Max (qwen-max)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="n2BaseUrl" type="text" value="https://api.deepseek.com/v1" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+            <input id="n2Model" type="text" value="deepseek-reasoner" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+          </div>
+          <input id="n2ApiKey" type="password" placeholder="Node 2 API Key (留空则用确定性规则编译器)" class="w-full rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+        </div>
+
+        <!-- Node 3 Config -->
+        <div class="rounded-xl bg-slate-950 border border-purple-500/30 p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-purple-400 mono">NODE 3 · REWRITER (主力语言学微创改写引擎)</span>
+            <select id="n3Preset" data-node="3" class="node-preset-select text-[11px] bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-200">
+              <option value="deepseek_r1">DeepSeek-R1 满血推理版 (deepseek-reasoner · 最强)</option>
+              <option value="deepseek">DeepSeek-V3 旗舰版 (deepseek-chat · 极速)</option>
+              <option value="qwen_max">阿里 Qwen-Max (qwen-max)</option>
+              <option value="gpt4o">OpenAI (gpt-4o)</option>
+              <option value="gemini_pro">Google Gemini (gemini-2.5-pro)</option>
+              <option value="siliconflow">硅基流动 (deepseek-ai/DeepSeek-R1)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="n3BaseUrl" type="text" value="https://api.deepseek.com/v1" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+            <input id="n3Model" type="text" value="deepseek-reasoner" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+          </div>
+          <input id="n3ApiKey" type="password" placeholder="留空即自动调用服务端 OWNER_API_KEY" class="w-full rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+        </div>
+
+        <!-- Node 4 Config -->
+        <div class="rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-emerald-400 mono">NODE 4 · VERIFIER GATE (复检门控与残差 Critic)</span>
+            <select id="n4Preset" data-node="4" class="node-preset-select text-[11px] bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-200">
+              <option value="local">白盒数学门控 + 四维语义守恒审计 (推荐·0延迟)</option>
+              <option value="deepseek">DeepSeek-V3 (deepseek-chat)</option>
+              <option value="deepseek_r1">DeepSeek-R1 (deepseek-reasoner)</option>
+              <option value="gemini_pro">Google Gemini (gemini-2.5-pro)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="n4BaseUrl" type="text" value="https://api.deepseek.com/v1" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+            <input id="n4Model" type="text" value="43d-Semantic-Gate" class="rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+          </div>
+          <input id="n4ApiKey" type="password" placeholder="Node 4 Critic API Key (留空则用四维数学+语义守恒门控)" class="w-full rounded bg-slate-900 border border-slate-800 px-2 py-1 text-slate-300 mono text-[11px]" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800 text-xs">
+        <div>
+          <label for="pythonBackendUrlInput" class="block text-slate-300 font-medium mb-1">服务端 API 代理路径 (默认自动挂载当前网站 /api/llm_proxy)</label>
+          <input id="pythonBackendUrlInput" type="text" placeholder="留空则默认请求当前域名 /api/llm_proxy" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-slate-200 mono" />
+        </div>
+        <div>
+          <label for="referenceCorpusInput" class="block text-slate-300 font-medium mb-1">目标作者参考语料 (Personal Style Profiler — 可选)</label>
+          <textarea id="referenceCorpusInput" rows="2" class="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-slate-200">We rarely notice infrastructure until it breaks. When hospital scheduling algorithms fail—even by a margin of four or five hours—the bottleneck cascades straight into emergency triage.</textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+        <button id="saveApiConfigBtn" type="button" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition cursor-pointer">
+          保存模型配置并立即运行 3 轮闭环
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastBanner" class="fixed bottom-4 right-4 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-xs text-white shadow-xl"></div>
+
+  
+<script src="/static/highlight.js?v=1"></script>
+<script src="/static/app.js?v=13"></script>
+</body>
+</html>

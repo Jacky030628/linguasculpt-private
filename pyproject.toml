@@ -1,0 +1,31 @@
+[project]
+name = "linguasculpt"
+version = "0.9.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "langchain>=1,<2",
+  "langgraph>=1,<2",
+  "langchain-deepseek>=0.1,<2",
+  "langgraph-checkpoint-sqlite>=2,<4",
+  "python-dotenv>=1,<2",
+  "httpx>=0.28,<1",
+  "numpy>=2,<3",
+  "pandas>=2,<4",
+  "scipy>=1.14,<2",
+  "scikit-learn==1.6.1",
+  "joblib>=1.4,<2",
+  "spacy>=3.8,<3.9",
+  "textstat==0.7.13",
+  "wordfreq==3.1.1",
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+  "vercel-queue>=0.1,<1",
+  "psycopg[binary]>=3.2,<4"
+]
+
+[tool.vercel]
+entrypoint = "app:app"
+
+[[tool.vercel.subscribers]]
+entrypoint = "backend.cloud_worker"

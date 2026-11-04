@@ -1,0 +1,20 @@
+[
+  {
+    "title": "经典叙事：Pride and Prejudice（公版节选）",
+    "source": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+    "attribution": "Jane Austen, Pride and Prejudice, chapter 1 (1813)",
+    "url": "https://www.gutenberg.org/ebooks/1342",
+    "purpose": "保留叙述立场和反讽；公版参考，不是标准答案"
+  },
+  {
+    "title": "学术约束：数字、引用与不确定性（自编）",
+    "source": "A pilot study of 48 participants found that the intervention may improve recall after 14 days. The observed difference was 7.5%, but the study did not establish causality. Working memory—temporary storage used during cognitive tasks—was assessed separately. These findings should not be generalized beyond this sample (Taylor, 2021).",
+    "terms": ["Working memory"],
+    "purpose": "合成测试，不代表真实研究；检查数字、定义、否定、引用与 may 的保护"
+  },
+  {
+    "title": "商业约束：目标与实际结果（自编）",
+    "source": "The team aims to reduce processing time by 15% in 2027. This figure is a target, not an achieved result. The current workflow requires two manual reviews, and neither review may be removed without approval. A smaller pilot could help identify bottlenecks before a wider rollout.",
+    "purpose": "合成测试；不得把目标改成已经实现的结果，不得改变审批限制"
+  }
+]

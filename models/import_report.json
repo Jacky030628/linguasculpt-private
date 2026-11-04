@@ -1,0 +1,11 @@
+{
+  "linguistic_raw": 65,
+  "linguistic_retained": 43,
+  "word_features": 4000,
+  "char_features": 2000,
+  "fusion_threshold": 0.33999999999999997,
+  "linguistic_threshold": 0.32999999999999996,
+  "cached_prediction_samples": 32,
+  "max_probability_error": 0.0,
+  "bundle_bytes": 140089
+}
