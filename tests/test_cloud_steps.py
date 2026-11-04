@@ -35,3 +35,44 @@ def test_durable_node_boundaries_preserve_state():
     assert state['status']=='completed'
     assert state['best']==SOURCE+' Revised.'
     assert state['source']==SOURCE
+
+
+def test_worker_releases_transaction_and_fences_late_result(monkeypatch):
+    from contextlib import contextmanager
+    import backend.cloud_worker as worker
+    row={'id':'abc','version':2,'status':'running','stage':'verify','state':{'candidate':'text'}}
+    active=[];queries=[]
+    class Connection:
+        rowcount=0  # Simulates a resume winning the version fence.
+        def execute(self,query,args):queries.append((query,args));return self
+        def fetchone(self):return row
+    @contextmanager
+    def database():
+        active.append(True)
+        try:yield Connection()
+        finally:active.pop()
+    class Graph:
+        def invoke(self,state):
+            assert not active  # No open DB transaction during NLP/model work.
+            return {'status':'completed'}
+    monkeypatch.setattr(worker,'database',database)
+    monkeypatch.setenv('OWNER_API_KEY','test-key')
+    monkeypatch.setattr(worker,'ChatDeepSeek',lambda **kwargs:object())
+    monkeypatch.setattr(worker,'build_natural_workflow',lambda *a,**k:Graph())
+    assert worker.process_step({'id':'abc','version':2}) is None
+    assert 'AND lease_id=%s' in queries[-1][0]
+    assert queries[-1][1][-2]==2
+
+
+def test_live_claim_prevents_duplicate_model_work(monkeypatch):
+    from contextlib import contextmanager
+    from datetime import datetime,timezone,timedelta
+    import backend.cloud_worker as worker
+    class Connection:
+        def execute(self,*args):return self
+        def fetchone(self):return {'id':'abc','version':2,'status':'running','lease_until':datetime.now(timezone.utc)+timedelta(seconds=30)}
+    @contextmanager
+    def database():yield Connection()
+    monkeypatch.setattr(worker,'database',database)
+    monkeypatch.setattr(worker,'ChatDeepSeek',lambda **kw:(_ for _ in ()).throw(AssertionError('duplicate model call')))
+    assert worker.process_step({'id':'abc','version':2}) is None

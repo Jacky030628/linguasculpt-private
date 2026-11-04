@@ -27,7 +27,9 @@ function showResult(task) {
     const active=task.status==='running';
     showPending(task.status,active ? undefined : '任务尚未完成，未展示中间稿。可恢复任务后继续。');
     const events=r.events || [];
-    setText('hostedEngineStatusLabel',task.error || `${task.status} · ${events.at(-1)?.message || '处理中'}`);
+    const progress=task.progress;
+    const waiting=progress ? `${progress.label} · ${progress.executing ? '处理中' : '等待云端执行'} · ${progress.idle_seconds} 秒` : (events.at(-1)?.message || '处理中');
+    setText('hostedEngineStatusLabel',task.error || `${task.status} · ${waiting}`);
     setText('agentLogConsole',events.map(e=>`${e.stage}: ${e.message}`).join('\n'));
     el('resumeTaskBtn').hidden=!['failed','interrupted'].includes(task.status);
     return;
@@ -179,7 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.user-level-lbl').forEach(b => b.onclick = () => { el('userRewriteSlider').value = b.dataset.level; });
   try {
     const health = await jsonFetch('/api/health');
-    setText('hostedEngineStatusLabel', health.hosted_llm_ready ? `后端就绪 · ${health.default_model}` : '请在 .env 配置 DeepSeek 密钥并重启');
+    setText('hostedEngineStatusLabel', health.hosted_llm_ready ? `后端就绪 · ${health.default_model}` : '后端配置尚未完成，请检查服务配置');
     const samples = await jsonFetch('/api/samples');
     const select = document.createElement('select');
     select.className = 'text-xs border rounded p-2 max-w-full';
