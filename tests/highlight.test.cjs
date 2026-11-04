@@ -1,5 +1,8 @@
 const assert=require('node:assert/strict');
-const {changedSegments}=require('../frontend/highlight.js');
+const fs=require('node:fs');
+const vm=require('node:vm');
+vm.runInThisContext(fs.readFileSync(require('node:path').join(__dirname,'../frontend/highlight.js'),'utf8'));
+const {changedSegments}=globalThis.proseHighlight;
 function check(before,after,changed) {
   const segments=changedSegments(before,after);
   assert.equal(segments.map(s=>s.text).join(''),after);
