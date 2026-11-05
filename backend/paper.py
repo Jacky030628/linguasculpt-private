@@ -5,7 +5,6 @@ import re
 import threading
 import joblib
 import numpy as np
-import pandas as pd
 import spacy
 import nltk
 from scipy.sparse import hstack, csr_matrix
@@ -34,7 +33,8 @@ def score(text: str) -> dict:
     with LOCK:
         b, nlp = resources()
         raw = extract_features_from_doc(nlp(text))
-        values = pd.DataFrame([raw], columns=b['feature_names']).replace([np.inf,-np.inf],0).fillna(0).values.astype(np.float32)
+        values = np.asarray([[raw.get(name, 0) for name in b['feature_names']]], dtype=np.float64)
+        values = np.where(np.isfinite(values), values, 0).astype(np.float32)
         unbounded_scaled = b['scaler'].transform(values)
         scaled = np.clip(unbounded_scaled, -b['z_clip'], b['z_clip'])
         selected = scaled[:,b['kept_indices']]
